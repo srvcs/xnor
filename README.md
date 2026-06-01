@@ -1,60 +1,69 @@
 # srvcs-xnor
 
-The logical-equivalence orchestrator of the srvcs.cloud distributed standard
-library.
+## Name
 
-Its single concern: **exclusive NOR (equivalence) of two booleans** — true
-exactly when `a == b`. It does no logic of its own. It asks
-[`srvcs-xor`](https://github.com/srvcs/xor) for `a XOR b`, then asks
-[`srvcs-not`](https://github.com/srvcs/not) to negate that verdict — yielding
-`NOT(a XOR b)`.
+| Field | Value |
+| --- | --- |
+| Service | `srvcs-xnor` |
+| Slug | `xnor` |
+| Repository | `srvcs/xnor` |
+| Package | `srvcs-xnor` |
+| Kind | `orchestrator` |
+
+## Function
+
+logic: NOT XOR (equivalence)
+
+## Dependencies
+
+| Dependency | Repository |
+| --- | --- |
+| `srvcs-xor` | [srvcs/xor](https://github.com/srvcs/xor) |
+| `srvcs-not` | [srvcs/not](https://github.com/srvcs/not) |
 
 ## API
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/` | Service identity, concern, and dependency list |
-| `POST` | `/` | Exclusive NOR (equivalence) of `a` and `b` |
-| `GET` | `/healthz` `/readyz` `/metrics` `/openapi.json` | srvcs service standard surface |
+| `GET` | `/` | Service identity |
+| `POST` | `/` | Evaluate the service function |
+| `GET` | `/healthz` | Liveness probe |
+| `GET` | `/readyz` | Readiness probe |
+| `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/openapi.json` | OpenAPI document |
 
-```sh
-curl -s -X POST localhost:8080/ -H 'content-type: application/json' -d '{"a": true, "b": true}'
-# {"a":true,"b":true,"result":true}
-```
+## Inputs
 
-Responses:
+| Name | Type | Required |
+| --- | --- | --- |
+| `a` | `json` | yes |
+| `b` | `json` | yes |
 
-- `200 {"a": x, "b": y, "result": true | false}` — evaluated.
-- `422` — invalid input, forwarded from a leaf dependency.
-- `503` — a dependency is unavailable.
+## Outputs
 
-## Orchestration
-
-```
-x      = srvcs-xor  { "a": a, "b": b }   -> result (bool)
-result = srvcs-not  { "value": x }       -> result (bool)
-```
-
-## Dependencies
-
-- [`srvcs-xor`](https://github.com/srvcs/xor)
-- [`srvcs-not`](https://github.com/srvcs/not)
-
-This is an orchestrator over boolean leaf services; its operands are booleans.
-Input validation propagates from the leaf dependencies via their `422`
-responses; this service does not validate operands itself.
+| Name | Type |
+| --- | --- |
+| `a` | `json` |
+| `b` | `json` |
+| `result` | `boolean` |
 
 ## Configuration
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `SRVCS_BIND_ADDR` | `0.0.0.0:8080` | Bind address |
-| `SRVCS_XOR_URL` | `http://127.0.0.1:8080` | Base URL of `srvcs-xor` |
-| `SRVCS_NOT_URL` | `http://127.0.0.1:8080` | Base URL of `srvcs-not` |
 | `SRVCS_ENV` | `development` | Environment label for logs |
 | `RUST_LOG` | `info,tower_http=info` | Tracing filter |
+| `SRVCS_NOT_URL` | `http://127.0.0.1:8080` | Base URL for srvcs-not |
+| `SRVCS_XOR_URL` | `http://127.0.0.1:8080` | Base URL for srvcs-xor |
 
-## Local checks
+## Error Behavior
+
+- `422` means the request could not be evaluated for the documented input shape.
+- `503` means a required dependency was unavailable or returned an unexpected response.
+- Dependency validation errors are forwarded when this service delegates validation.
+
+## Local Checks
 
 ```sh
 cargo fmt --check
@@ -62,10 +71,8 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-Orchestration tests stand up mock `srvcs-xor` and `srvcs-not` services
-in-process, covering the truth table, a degraded dependency (`503`), and a
-forwarded `422`. See [`srvcs/platform`](https://github.com/srvcs/platform) for
-the shared standard.
+See the [srvcs service standard](https://github.com/srvcs/platform/blob/main/STANDARD.md) for the full operational contract.
 
-> Note: the `cargoHash` in `flake.nix` is inherited from the template and must be
-> refreshed with a `nix build` before the Nix gates pass.
+## Metadata
+
+Machine-readable service metadata lives in `srvcs.yaml`. Keep it aligned with this README when the service contract changes.
